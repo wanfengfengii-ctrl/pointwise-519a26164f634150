@@ -1,0 +1,12 @@
+{
+  "measurements": {"batch_id": "joint-coating", "parent_id": null, "readings": [["A", 10], ["B", 9], ["C", 8], ["D", 7]]},
+  "full": {
+    "task_id": "J-full",
+    "cases": [["甲", ["D", "C", "B", "A"]], ["乙", ["B", "A"]]],
+    "first": [["甲", "C"]],
+    "remaining": [["乙", "A"], ["乙", "B"], ["甲", "D"]],
+    "misroute": {"case_id": "甲", "sent_specimen_id": "D", "substitute_specimen_id": "A"}
+  },
+  "shortage": {"task_id": "J-short", "cases": [["甲", ["A", "B", "C"]], ["乙", ["A", "B", "C"]]]},
+  "preference": {"task_id": "J-pref", "cases": [["甲", ["A", "B", "C", "D"]], ["乙", ["A", "B", "C"]]]}
+}

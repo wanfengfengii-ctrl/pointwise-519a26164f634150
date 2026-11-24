@@ -1,0 +1,5 @@
+{
+  "batch_id": "shift-coating",
+  "parent_id": null,
+  "readings": [["A", "9"], ["B", "8"], ["C", "7"]]
+}
