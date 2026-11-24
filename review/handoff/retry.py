@@ -2,6 +2,7 @@ from review.handoff.ack import apply_field_outcome
 from review.handoff.delivery import exchange
 from review.pick.case import CaseStore
 from review.pick.dispatch import DispatchLedger
+from review.pick.joint import JointTaskStore
 
 
 def _transfer(db, envelope, operation, perform):
@@ -28,3 +29,21 @@ def resume_delivery(db, channel, case_id, *, claim=False):
     assignments = DispatchLedger(db).list_case_dispatches(case_id, revision_id=case.effective_revision)
     return tuple(retry_dispatch(db, channel, assignment.envelope.dispatch_id, claim=claim)
                  for assignment in assignments)
+
+
+def deliver_joint(db, channel, task_id, dispatch_ids):
+    """Send only the named dispatches of a fixed joint task, in request order."""
+    task = JointTaskStore(db).require_task(task_id)
+    if task.status != 'ready':
+        raise ValueError(f'joint task is not ready for delivery: {task_id}')
+    if not isinstance(dispatch_ids, (tuple, list)) or not dispatch_ids:
+        raise ValueError('joint delivery requires a nonempty dispatch sequence')
+    known = {assignment.envelope.dispatch_id: assignment
+             for assignment in JointTaskStore(db).list_task_dispatches(task_id)}
+    results = []
+    for dispatch_id in dispatch_ids:
+        if dispatch_id not in known:
+            raise ValueError(f'dispatch does not belong to joint task {task_id}: {dispatch_id}')
+        envelope = known[dispatch_id].envelope
+        results.append(exchange(db, envelope, 'send', channel.send))
+    return tuple(results)

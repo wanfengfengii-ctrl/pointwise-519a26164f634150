@@ -8,6 +8,7 @@ from review.measure.correction import check_correction_lineage
 from review.measure.reading import require_name, require_revision_number
 from review.pick.case import CaseStore
 from review.pick.dispatch import DispatchAssignment, DispatchLedger
+from review.pick.joint import JointTaskStore
 from review.pick.progress import ProgressLedger
 from review.pick.ranking import select_candidates
 from review.storage import atomic
@@ -83,9 +84,11 @@ def correct(db, channel, case_id, request_id, revision_id):
     corrections = CorrectionStore(db)
     acknowledgments = AckLedger(db)
     with atomic(db):
+        case = cases.require(case_id)
+        if JointTaskStore(db).task_of_case(case_id) is not None:
+            raise ValueError('joint review cases cannot be replanned by correction')
         request = corrections.find(request_id)
         if request is None:
-            case = cases.require(case_id)
             check_correction_lineage(catalog, case.effective_revision, revision_id)
             request = corrections.save_pending(request_id, case_id, case.effective_revision, revision_id)
         elif (request.case_id, request.revision_id) != (case_id, revision_id):

@@ -1,6 +1,7 @@
 from review.field.acceptance import receive, retire_dispatch
 from review.field.handover import read_dispatch_outcome
 from review.field.inbox import FieldInbox
+from review.field.joint import JointManifest, gate_legacy_send, joint_permit, send_joint
 from review.handoff.envelope import same_dispatch
 from review.storage import atomic
 
@@ -20,9 +21,19 @@ class DeliveryChannel:
 
     def send(self, envelope):
         field = self._connection()
+        if gate_legacy_send(field, envelope):
+            return read_dispatch_outcome(field, envelope.dispatch_id)
         with atomic(field):
             FieldInbox(field).register(envelope)
             return read_dispatch_outcome(field, envelope.dispatch_id)
+
+    def send_joint(self, task_id, envelope, permit=None):
+        return send_joint(self._connection(), task_id, envelope, permit)
+
+    def publish_joint(self, task_id, revision_id, assignments):
+        field = self._connection()
+        JointManifest(field).publish(task_id, revision_id, assignments)
+        return joint_permit(task_id, assignments[0].envelope.dispatch_id)
 
     def claim(self, envelope):
         return receive(self._connection(), envelope)

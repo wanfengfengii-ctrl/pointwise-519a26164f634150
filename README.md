@@ -42,3 +42,9 @@ python3 -B -m review.handoff.workbench --analysis analysis.sqlite3 read case-1
 以上命令使用两个新库，因而首执按 `receipt-1`、`receipt-2` 分配。已有库应使用实际返回的首执号。JSON 输出用字符串表示精确分数。读值可用整数或分数字符串，Python 接口还接受 `Fraction`。缺值、布尔值、浮点数、零分母、重复试片、非法父修订和同号改参均拒绝。试片号为非空字符串，排序使用 Python 字符串顺序。CLI 对输入错误给出非零退出码，业务待核、现场终局拒绝及未结案有各自的返回值。
 
 `review.storage.connect` 打开连接，`review.handoff.workbench.initialize` 建表及可选样例。六个业务入口分别为 `MeasurementCatalog.record(batch_id, parent_id, readings)`、`review.pick.case.open(db, case_id, revision_id)`、`review.pick.replan.correct(db, channel, case_id, request_id, revision_id)`、`review.field.acceptance.receive(field_db, envelope)`、`review.close.publish.finalize(db, case_id, evidence)` 及 `review.close.history.read(db, case_id)`。`finalize` 可提交首执号或完整 `Receipt`。`DeliveryChannel.send` 持久交付绑定，`retry_dispatch` 续送原派发，`sync_dispatch` 读取现场结果并核对入账。独立连接分别提交，现场首领、原终局重领和资格封止均使用现场库的持久记录。待核期间案的生效修订保持原值，现场已经裁决的旧件保留其处置，重办可继续核齐。
+
+## 联合复检派样
+
+同批多案以一个任务号联合派样，先固定整组归属再分批送件。`review.pick.joint.open_joint(analysis, channel, task_id, revision_id, cases)` 受理 `(案号, 候选片号集合)` 的有序序列；每案核定两片、任务内每片仅归一案，按精确厚度降序、片号升序在所有可配满安排中取字典序最前者。返回 `ready`（`assignments` 为按案序排列的 `DispatchAssignment` 元组）、`shortage`（缺口案组 `cases` 及其候选并集 `candidates`，整单不派发）或 `pending`（现场暂不可确认，凭原参数续办）。同号同参续办保持归属与派发号稳定，同号改参抛 `ValueError`；联合案的案号对其他开案保留。
+
+`review.handoff.retry.deliver_joint(analysis, channel, task_id, dispatch_ids)` 只送指定派发，按请求顺序返回 `FieldOutcome` 元组，暂未确认时为 `None`，原号可重发。逐片交接用 `DeliveryChannel.send_joint(task_id, envelope, permit=None)`：现场依据工作台发布的固定归属核对任务、案号、派发号、片号、固定修订和原值；错挂或同号异内容抛 `ValueError` 且不占用真派发号，证据暂缺返回 `None` 待核。分析连接关闭后现场仍可首领已到件，未到件与在途归属均受保护。联合案继续用原 `sync_dispatch`、`finalize`、`read` 逐案核回与结案；`correct` 对联合案抛 `ValueError`，后续测值修订不改变联合安排，普通单案行为不变。`python3 -B -m review.handoff.workbench demo` 末尾以 `samples/joint.json` 演示真实归属、分批领件、错挂拒绝及两案分别结案。
